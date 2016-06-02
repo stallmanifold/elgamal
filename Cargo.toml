@@ -7,3 +7,4 @@ authors = ["Stallmanifold <stallmanifold@gmail.com>"]
 rust-crypto = "^0.2"
 quickcheck  = "0.2.27"
 num         = "0.1.32"
+rand        = "0.3.14"
