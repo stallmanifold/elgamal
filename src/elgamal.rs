@@ -1,18 +1,124 @@
-use num;
+#![allow(dead_code)]
+use num::BigInt;
+use num::bigint::RandBigInt;
+use rand;
+use modpow::ModPow;
 
-pub struct GroupDescription<T> {
-    order: num::BigUint,
-    gen:   T,
+
+type CipherText = Vec<u8>;
+type PlainText  = Vec<u8>;
+
+#[derive(Clone)]
+pub struct GroupDescription {
+    p: BigInt,
+    g: BigInt,
+    bit_size: usize,
 }
 
-pub struct PublicKey<T> {
-    group: GroupDescription<T>,
-    gen: T,
-    key: T,
+impl GroupDescription {
+    fn new(p: BigInt, g: BigInt) -> GroupDescription {
+        let bit_size = p.bits();
+
+        GroupDescription {
+            p: p,
+            g: g,
+            bit_size: bit_size,
+        }
+    }
 }
 
-pub struct PrivateKey<T> {
-    group: GroupDescription<T>,
-    gen:   T,
-    key:   T,
+#[derive(Clone)]
+pub struct PublicKey {
+    group: GroupDescription,
+    g:     BigInt,
+    key:   BigInt,
+}
+
+impl PublicKey {
+    fn new(group: GroupDescription, g: BigInt, key: BigInt) -> PublicKey {
+        PublicKey {
+            group: group,
+            g: g,
+            key: key,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct PrivateKey {
+    group: GroupDescription,
+    g:     BigInt,
+    key:   BigInt,
+}
+
+impl PrivateKey {
+    fn new(group: GroupDescription, g: BigInt, key: BigInt) -> PrivateKey {
+        PrivateKey {
+            group: group,
+            g: g,
+            key: key,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct KeyPair {
+    private_key: PrivateKey,
+    public_key: PublicKey,
+}
+
+impl KeyPair {
+    fn new(private_key: PrivateKey, public_key: PublicKey) -> KeyPair {
+        KeyPair {
+            private_key: private_key,
+            public_key: public_key,
+        }
+    }
+
+    fn private_key(&self) -> PrivateKey {
+        self.private_key.clone()
+    }
+
+    fn public_key(&self) -> PublicKey {
+        self.public_key.clone()
+    }
+}
+
+trait PublicKeyEncryptionScheme {
+    fn generate(&mut self, desc: &GroupDescription)    -> KeyPair;
+    fn encrypt(&self, message: &[u8], key: PublicKey)  -> CipherText;
+    fn decrypt(&self, message: &[u8], key: PrivateKey) -> PlainText;
+}
+
+pub struct ElGamal<R> {
+    rng: R,
+}
+
+impl<R> ElGamal<R> where R: rand::Rng {
+    fn new(rng: R) -> ElGamal<R> {
+        ElGamal { 
+            rng: rng,
+        }
+    }
+}
+
+impl<R> PublicKeyEncryptionScheme for ElGamal<R> where R: rand::Rng {
+    fn generate(&mut self, desc: &GroupDescription) -> KeyPair {
+        let lbound: BigInt = BigInt::from(1 as usize);
+        let x: BigInt = RandBigInt::gen_bigint_range(&mut self.rng, &lbound, &desc.p);
+        let h: BigInt = <BigInt as ModPow>::mod_pow(&desc.g, &x, &desc.p);
+
+        let private_key = PrivateKey::new(desc.clone(), desc.g.clone(), x);
+        let public_key  = PublicKey::new(desc.clone(), desc.g.clone(), h);
+
+        KeyPair::new(private_key, public_key)
+    }
+
+    fn encrypt(&self, message: &[u8], key: PublicKey) -> CipherText {
+        unimplemented!();
+    }
+
+    fn decrypt(&self, message: &[u8], key: PrivateKey) -> PlainText {
+        unimplemented!();
+    }
 }
