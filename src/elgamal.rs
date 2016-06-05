@@ -6,7 +6,7 @@ use modpow::ModPow;
 
 
 type CipherText = (BigInt, BigInt);
-type PlainText  = Vec<u8>;
+type PlainText  = BigInt;
 
 #[derive(Clone)]
 pub struct GroupDescription {
@@ -85,9 +85,9 @@ impl KeyPair {
 }
 
 trait PublicKeyEncryptionScheme {
-    fn generate(&mut self, desc: &GroupDescription)         -> KeyPair;
-    fn encrypt(&mut self, message: &[u8], key: &PublicKey)  -> CipherText;
-    fn decrypt(&mut self, message: &[u8], key: &PrivateKey) -> PlainText;
+    fn generate(&mut self, desc: &GroupDescription)           -> KeyPair;
+    fn encrypt(&mut self, message: &[u8], key: &PublicKey)    -> CipherText;
+    fn decrypt(&self, message: &CipherText, key: &PrivateKey) -> PlainText;
 }
 
 pub struct ElGamal<R> {
@@ -130,7 +130,12 @@ impl<R> PublicKeyEncryptionScheme for ElGamal<R> where R: rand::Rng {
 
     }
 
-    fn decrypt(&mut self, message: &[u8], key: &PrivateKey) -> PlainText {
-        unimplemented!();
+    fn decrypt(&self, cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
+        let gamma = &cipher_text.0;
+        let delta = &cipher_text.1;
+        let c = <BigInt as ModPow>::mod_pow(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
+        let m = Integer::mod_floor(&(c * delta), &key.group.p);
+
+        m
     }
 }
