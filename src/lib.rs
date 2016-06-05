@@ -1,9 +1,8 @@
 extern crate num;
 extern crate rand;
-
+extern crate modexp;
 
 pub mod elgamal;
-mod modpow;
 
 #[cfg(test)]
 mod tests;
