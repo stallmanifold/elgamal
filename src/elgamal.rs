@@ -2,7 +2,7 @@
 use num::{BigInt, Integer};
 use num::bigint::{RandBigInt, Sign};
 use rand;
-use modpow::ModPow;
+use modexp::ModExp;
 
 
 type CipherText = (BigInt, BigInt);
@@ -104,9 +104,9 @@ impl<R> ElGamal<R> where R: rand::Rng {
 
 impl<R> PublicKeyEncryptionScheme for ElGamal<R> where R: rand::Rng {
     fn generate(&mut self, desc: &GroupDescription) -> KeyPair {
-        let lbound: BigInt = BigInt::from(1 as usize);
+        let lbound: BigInt = BigInt::from(1);
         let x: BigInt = RandBigInt::gen_bigint_range(&mut self.rng, &lbound, &desc.p);
-        let h: BigInt = <BigInt as ModPow>::mod_pow(&desc.g, &x, &desc.p);
+        let h: BigInt = <BigInt as ModExp<&_>>::mod_exp(&desc.g, &x, &desc.p);
 
         let private_key = PrivateKey::new(desc.clone(), desc.g.clone(), x);
         let public_key  = PublicKey::new(desc.clone(), desc.g.clone(), h);
@@ -120,10 +120,10 @@ impl<R> PublicKeyEncryptionScheme for ElGamal<R> where R: rand::Rng {
         let ubound = &key.group.p - BigInt::from(2);
         let nonce  = RandBigInt::gen_bigint_range(&mut self.rng, &lbound, &ubound);
         
-        let gamma = <BigInt as ModPow>::mod_pow(&key.g, &nonce, &key.group.p);
+        let gamma = <BigInt as ModExp<&_>>::mod_exp(&key.g, &nonce, &key.group.p);
         
         let mmp = m.mod_floor(&key.group.p);
-        let ak  = <BigInt as ModPow>::mod_pow(&key.key, &nonce, &key.group.p);
+        let ak  = <BigInt as ModExp<&_>>::mod_exp(&key.key, &nonce, &key.group.p);
         let delta = Integer::mod_floor(&(mmp*ak), &key.group.p);
 
         (gamma, delta)
@@ -133,7 +133,7 @@ impl<R> PublicKeyEncryptionScheme for ElGamal<R> where R: rand::Rng {
     fn decrypt(&self, cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
         let gamma = &cipher_text.0;
         let delta = &cipher_text.1;
-        let c = <BigInt as ModPow>::mod_pow(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
+        let c = <BigInt as ModExp<&_>>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
         let m = Integer::mod_floor(&(c * delta), &key.group.p);
 
         m
