@@ -1,11 +1,11 @@
 #![allow(dead_code)]
-use num::BigInt;
-use num::bigint::RandBigInt;
+use num::{BigInt, Integer};
+use num::bigint::{RandBigInt, Sign};
 use rand;
 use modpow::ModPow;
 
 
-type CipherText = Vec<u8>;
+type CipherText = (BigInt, BigInt);
 type PlainText  = Vec<u8>;
 
 #[derive(Clone)]
@@ -85,9 +85,9 @@ impl KeyPair {
 }
 
 trait PublicKeyEncryptionScheme {
-    fn generate(&mut self, desc: &GroupDescription)    -> KeyPair;
-    fn encrypt(&self, message: &[u8], key: PublicKey)  -> CipherText;
-    fn decrypt(&self, message: &[u8], key: PrivateKey) -> PlainText;
+    fn generate(&mut self, desc: &GroupDescription)         -> KeyPair;
+    fn encrypt(&mut self, message: &[u8], key: &PublicKey)  -> CipherText;
+    fn decrypt(&mut self, message: &[u8], key: &PrivateKey) -> PlainText;
 }
 
 pub struct ElGamal<R> {
@@ -114,11 +114,23 @@ impl<R> PublicKeyEncryptionScheme for ElGamal<R> where R: rand::Rng {
         KeyPair::new(private_key, public_key)
     }
 
-    fn encrypt(&self, message: &[u8], key: PublicKey) -> CipherText {
-        unimplemented!();
+    fn encrypt(&mut self, message: &[u8], key: &PublicKey) -> CipherText {
+        let m = BigInt::from_bytes_be(Sign::Plus, message);
+        let lbound = BigInt::from(1);
+        let ubound = &key.group.p - BigInt::from(2);
+        let nonce  = RandBigInt::gen_bigint_range(&mut self.rng, &lbound, &ubound);
+        
+        let gamma = <BigInt as ModPow>::mod_pow(&key.g, &nonce, &key.group.p);
+        
+        let mmp = m.mod_floor(&key.group.p);
+        let ak  = <BigInt as ModPow>::mod_pow(&key.key, &nonce, &key.group.p);
+        let delta = Integer::mod_floor(&(mmp*ak), &key.group.p);
+
+        (gamma, delta)
+
     }
 
-    fn decrypt(&self, message: &[u8], key: PrivateKey) -> PlainText {
+    fn decrypt(&mut self, message: &[u8], key: &PrivateKey) -> PlainText {
         unimplemented!();
     }
 }
