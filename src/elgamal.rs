@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 use num::{BigInt, Integer};
 use num::bigint::{RandBigInt, Sign};
-use rand;
 use modexp::ModExp;
+use rand::Rng;
 
 
-type CipherText = (BigInt, BigInt);
-type PlainText  = BigInt;
+pub type CipherText = (BigInt, BigInt);
+pub type PlainText  = BigInt;
 
 #[derive(Clone)]
 pub struct GroupDescription {
@@ -16,12 +16,12 @@ pub struct GroupDescription {
 }
 
 impl GroupDescription {
-    fn new(p: BigInt, g: BigInt) -> GroupDescription {
+    pub fn new(p: &BigInt, g: &BigInt) -> GroupDescription {
         let bit_size = p.bits();
 
         GroupDescription {
-            p: p,
-            g: g,
+            p: p.clone(),
+            g: g.clone(),
             bit_size: bit_size,
         }
     }
@@ -35,11 +35,11 @@ pub struct PublicKey {
 }
 
 impl PublicKey {
-    fn new(group: GroupDescription, g: BigInt, key: BigInt) -> PublicKey {
+    pub fn new(group: &GroupDescription, g: &BigInt, key: &BigInt) -> PublicKey {
         PublicKey {
-            group: group,
-            g: g,
-            key: key,
+            group: group.clone(),
+            g: g.clone(),
+            key: key.clone(),
         }
     }
 }
@@ -52,11 +52,11 @@ pub struct PrivateKey {
 }
 
 impl PrivateKey {
-    fn new(group: GroupDescription, g: BigInt, key: BigInt) -> PrivateKey {
+    pub fn new(group: &GroupDescription, g: &BigInt, key: &BigInt) -> PrivateKey {
         PrivateKey {
-            group: group,
-            g: g,
-            key: key,
+            group: group.clone(),
+            g: g.clone(),
+            key: key.clone(),
         }
     }
 }
@@ -68,74 +68,53 @@ pub struct KeyPair {
 }
 
 impl KeyPair {
-    fn new(private_key: PrivateKey, public_key: PublicKey) -> KeyPair {
+    pub fn new(private_key: PrivateKey, public_key: PublicKey) -> KeyPair {
         KeyPair {
             private_key: private_key,
             public_key: public_key,
         }
     }
 
-    fn private_key(&self) -> PrivateKey {
+    pub fn private_key(&self) -> PrivateKey {
         self.private_key.clone()
     }
 
-    fn public_key(&self) -> PublicKey {
+    pub fn public_key(&self) -> PublicKey {
         self.public_key.clone()
     }
 }
 
-trait PublicKeyEncryptionScheme {
-    fn generate(&mut self, desc: &GroupDescription)           -> KeyPair;
-    fn encrypt(&mut self, message: &[u8], key: &PublicKey)    -> CipherText;
-    fn decrypt(&self, message: &CipherText, key: &PrivateKey) -> PlainText;
+pub fn generate<R: Rng>(rng: &mut R, desc: &GroupDescription) -> KeyPair {
+    let lbound: BigInt = BigInt::from(1);
+    let x: BigInt = RandBigInt::gen_bigint_range(rng, &lbound, &desc.p);
+    let h: BigInt = <BigInt as ModExp<&_>>::mod_exp(&desc.g, &x, &desc.p);
+
+    let private_key = PrivateKey::new(&desc, &desc.g, &x);
+    let public_key  = PublicKey::new(&desc, &desc.g, &h);
+
+    KeyPair::new(private_key, public_key)
 }
 
-pub struct ElGamal<R> {
-    rng: R,
-}
-
-impl<R> ElGamal<R> where R: rand::Rng {
-    fn new(rng: R) -> ElGamal<R> {
-        ElGamal { 
-            rng: rng,
-        }
-    }
-}
-
-impl<R> PublicKeyEncryptionScheme for ElGamal<R> where R: rand::Rng {
-    fn generate(&mut self, desc: &GroupDescription) -> KeyPair {
-        let lbound: BigInt = BigInt::from(1);
-        let x: BigInt = RandBigInt::gen_bigint_range(&mut self.rng, &lbound, &desc.p);
-        let h: BigInt = <BigInt as ModExp<&_>>::mod_exp(&desc.g, &x, &desc.p);
-
-        let private_key = PrivateKey::new(desc.clone(), desc.g.clone(), x);
-        let public_key  = PublicKey::new(desc.clone(), desc.g.clone(), h);
-
-        KeyPair::new(private_key, public_key)
-    }
-
-    fn encrypt(&mut self, message: &[u8], key: &PublicKey) -> CipherText {
-        let m = BigInt::from_bytes_be(Sign::Plus, message);
-        let lbound = BigInt::from(1);
-        let ubound = &key.group.p - BigInt::from(2);
-        let nonce  = RandBigInt::gen_bigint_range(&mut self.rng, &lbound, &ubound);
+pub fn encrypt<R: Rng>(rng: &mut R, message: &[u8], key: &PublicKey) -> CipherText {
+    let m = BigInt::from_bytes_be(Sign::Plus, message);
+    let lbound = BigInt::from(1);
+    let ubound = &key.group.p - BigInt::from(2);
+    let nonce  = RandBigInt::gen_bigint_range(rng, &lbound, &ubound);
         
-        let gamma = <BigInt as ModExp<&_>>::mod_exp(&key.g, &nonce, &key.group.p);
+    let gamma = <BigInt as ModExp<&_>>::mod_exp(&key.g, &nonce, &key.group.p);
         
-        let mmp = m.mod_floor(&key.group.p);
-        let ak  = <BigInt as ModExp<&_>>::mod_exp(&key.key, &nonce, &key.group.p);
-        let delta = Integer::mod_floor(&(mmp*ak), &key.group.p);
+    let mmp = m.mod_floor(&key.group.p);
+    let ak  = <BigInt as ModExp<&_>>::mod_exp(&key.key, &nonce, &key.group.p);
+    let delta = Integer::mod_floor(&(mmp*ak), &key.group.p);
 
-        (gamma, delta)
+    (gamma, delta)
 
-    }
+}
 
-    fn decrypt(&self, cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
-        let gamma = &cipher_text.0;
-        let delta = &cipher_text.1;
-        let c = <BigInt as ModExp<&_>>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
-        let m = Integer::mod_floor(&(c * delta), &key.group.p);
-
-        m
-    }
+pub fn decrypt(cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
+    let gamma = &cipher_text.0;
+    let delta = &cipher_text.1;
+    let c = <BigInt as ModExp<&_>>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
+        
+    Integer::mod_floor(&(c * delta), &key.group.p)
 }
