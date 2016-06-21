@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use num::{BigInt, Integer};
 use num::bigint::{RandBigInt, Sign};
-use modexp::ModExp;
+use modal::ModExp;
 use rand::Rng;
 
 
