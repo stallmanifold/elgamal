@@ -12,4 +12,4 @@ rust-crypto     = "^0.2"
 num             = "0.1.32"
 rand            = "0.3.14"
 rustc-serialize = "0.3.19"
-modexp          = { path = "modexp" }
+modal           = { git = "https://github.com/stallmanifold/modal" }
