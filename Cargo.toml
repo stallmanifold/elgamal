@@ -8,8 +8,8 @@ name = "elgamal"
 path = "src/lib.rs"
 
 [dependencies]
-rust-crypto = "^0.2"
-quickcheck  = "0.2.27"
-num         = "0.1.32"
-rand        = "0.3.14"
-modexp      = { path = "../modexp" }
+rust-crypto     = "^0.2"
+num             = "0.1.32"
+rand            = "0.3.14"
+rustc-serialize = "0.3.19"
+modexp          = { path = "modexp" }
