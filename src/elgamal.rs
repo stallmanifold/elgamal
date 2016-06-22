@@ -84,15 +84,14 @@ impl KeyPair {
     }
 }
 
-pub fn generate<R: Rng>(rng: &mut R, desc: &GroupDescription) -> KeyPair {
-    let lbound: BigInt = BigInt::from(1);
-    let x: BigInt = RandBigInt::gen_bigint_range(rng, &lbound, &desc.p);
-    let h: BigInt = <BigInt as ModExp<&_>>::mod_exp(&desc.g, &x, &desc.p);
+#[inline]
+fn decode(digit: &BigInt) -> Vec<u8> {
+    BigInt::to_bytes_be(digit).1
+}
 
-    let private_key = PrivateKey::new(&desc, &desc.g, &x);
-    let public_key  = PublicKey::new(&desc, &desc.g, &h);
-
-    KeyPair::new(private_key, public_key)
+#[inline]
+fn encode(bytes: &[u8]) -> BigInt {
+    BigInt::from_bytes_be(Sign::Plus, bytes)
 }
 
 #[inline]
@@ -106,6 +105,24 @@ fn __encrypt(digit: &BigInt, nonce: &BigInt, key: &PublicKey) -> (BigInt, BigInt
     (gamma, delta)
 }
 
+#[inline]
+fn __decrypt(gamma: &BigInt, delta: &BigInt, key: &PrivateKey) -> BigInt {
+    let c = <BigInt as ModExp<&_>>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
+        
+    Integer::mod_floor(&(c * delta), &key.group.p)
+}
+
+pub fn generate<R: Rng>(rng: &mut R, desc: &GroupDescription) -> KeyPair {
+    let lbound: BigInt = BigInt::from(1);
+    let x: BigInt = RandBigInt::gen_bigint_range(rng, &lbound, &desc.p);
+    let h: BigInt = <BigInt as ModExp<&_>>::mod_exp(&desc.g, &x, &desc.p);
+
+    let private_key = PrivateKey::new(&desc, &desc.g, &x);
+    let public_key  = PublicKey::new(&desc, &desc.g, &h);
+
+    KeyPair::new(private_key, public_key)
+}
+
 pub fn encrypt<R: Rng>(rng: &mut R, plain_text: &[u8], key: &PublicKey) -> CipherText {
     let lbound = BigInt::from(1);
     let ubound = &key.group.p - BigInt::from(2);
@@ -117,7 +134,7 @@ pub fn encrypt<R: Rng>(rng: &mut R, plain_text: &[u8], key: &PublicKey) -> Ciphe
     let mut digits  = Vec::new();
 
     for chunk in plain_text.chunks(bytes_per_digit) {
-        let digit = BigInt::from_bytes_be(Sign::Plus, chunk);
+        let digit = encode(chunk);
         let (gamma, delta) = __encrypt(&digit, &nonce, key);
         digits.push((gamma, delta));
     }
@@ -125,20 +142,13 @@ pub fn encrypt<R: Rng>(rng: &mut R, plain_text: &[u8], key: &PublicKey) -> Ciphe
     digits
 }
 
-#[inline]
-fn __decrypt(gamma: &BigInt, delta: &BigInt, key: &PrivateKey) -> BigInt {
-    let c = <BigInt as ModExp<&_>>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
-        
-    Integer::mod_floor(&(c * delta), &key.group.p)
-}
-
 pub fn decrypt(cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
     let mut plain_text = Vec::new();
 
     for &(ref gamma, ref delta) in cipher_text {
         let digit     = __decrypt(&gamma, &delta, key);
-        let mut chunk = BigInt::to_bytes_be(&digit).1;
-        plain_text.append(&mut chunk)
+        let mut chunk = decode(&digit);
+        plain_text.append(&mut chunk);
     }
 
     plain_text
