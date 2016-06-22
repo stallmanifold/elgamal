@@ -5,8 +5,8 @@ use modal::ModExp;
 use rand::Rng;
 
 
-pub type CipherText = (BigInt, BigInt);
-pub type PlainText  = BigInt;
+pub type CipherText = Vec<(BigInt, BigInt)>;
+pub type PlainText  = Vec<u8>;
 
 #[derive(Clone)]
 pub struct GroupDescription {
@@ -95,26 +95,51 @@ pub fn generate<R: Rng>(rng: &mut R, desc: &GroupDescription) -> KeyPair {
     KeyPair::new(private_key, public_key)
 }
 
-pub fn encrypt<R: Rng>(rng: &mut R, message: &[u8], key: &PublicKey) -> CipherText {
-    let m = BigInt::from_bytes_be(Sign::Plus, message);
-    let lbound = BigInt::from(1);
-    let ubound = &key.group.p - BigInt::from(2);
-    let nonce  = RandBigInt::gen_bigint_range(rng, &lbound, &ubound);
-        
+#[inline]
+fn __encrypt(digit: &BigInt, nonce: &BigInt, key: &PublicKey) -> (BigInt, BigInt) {      
     let gamma = <BigInt as ModExp<&_>>::mod_exp(&key.g, &nonce, &key.group.p);
         
-    let mmp = m.mod_floor(&key.group.p);
+    let mmp = digit.mod_floor(&key.group.p);
     let ak  = <BigInt as ModExp<&_>>::mod_exp(&key.key, &nonce, &key.group.p);
     let delta = Integer::mod_floor(&(mmp*ak), &key.group.p);
 
     (gamma, delta)
-
 }
 
-pub fn decrypt(cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
-    let gamma = &cipher_text.0;
-    let delta = &cipher_text.1;
+pub fn encrypt<R: Rng>(rng: &mut R, plain_text: &[u8], key: &PublicKey) -> CipherText {
+    let lbound = BigInt::from(1);
+    let ubound = &key.group.p - BigInt::from(2);
+    let nonce  = RandBigInt::gen_bigint_range(rng, &lbound, &ubound);
+
+    let bits_per_digit  = key.group.p.bits() - 1;
+    let bytes_per_digit = bits_per_digit / 8;
+
+    let mut digits  = Vec::new();
+
+    for chunk in plain_text.chunks(bytes_per_digit) {
+        let digit = BigInt::from_bytes_be(Sign::Plus, chunk);
+        let (gamma, delta) = __encrypt(&digit, &nonce, key);
+        digits.push((gamma, delta));
+    }
+
+    digits
+}
+
+#[inline]
+fn __decrypt(gamma: &BigInt, delta: &BigInt, key: &PrivateKey) -> BigInt {
     let c = <BigInt as ModExp<&_>>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
         
     Integer::mod_floor(&(c * delta), &key.group.p)
+}
+
+pub fn decrypt(cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
+    let mut plain_text = Vec::new();
+
+    for &(ref gamma, ref delta) in cipher_text {
+        let digit     = __decrypt(&gamma, &delta, key);
+        let mut chunk = BigInt::to_bytes_be(&digit).1;
+        plain_text.append(&mut chunk)
+    }
+
+    plain_text
 }
