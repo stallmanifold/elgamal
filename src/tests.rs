@@ -137,7 +137,6 @@ fn run_tests(test: &Test) {
     for test_case in test.data.iter() {
         let cipher_text = elgamal::encrypt(&mut rng, test_case.plain_text.as_ref(), &test_case.public_key);
         let recovered_plain_text: Vec<u8> = elgamal::decrypt(&cipher_text, &test_case.private_key);
-        //let plain_text = BigInt::from_bytes_be(Sign::Plus, test_case.plain_text.as_ref());
 
         assert_eq!(&test_case.plain_text, &recovered_plain_text);
     }
