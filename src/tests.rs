@@ -3,8 +3,8 @@ use super::elgamal::{GroupDescription, PrivateKey, PublicKey, KeyPair};
 use crypto::fortuna::Fortuna;
 use rand::SeedableRng;
 use num::BigInt;
-use num::bigint::Sign;
-use rustc_serialize::base64;
+//use num::bigint::Sign;
+//use rustc_serialize::base64;
 
 
 // Stock lorem ipsum text
@@ -100,10 +100,10 @@ fn elgamal_generated_key_test_cases() -> Test {
     let gen     = BigInt::from(62);
     let desc    = GroupDescription::new(&modulus, &gen);
 
-    let key_pair1    = elgamal::generate(&mut rng, &desc);
-    let key_pair2    = elgamal::generate(&mut rng, &desc);
-    let key_pair3    = elgamal::generate(&mut rng, &desc);
-    let key_pair4    = elgamal::generate(&mut rng, &desc);
+    let key_pair1 = elgamal::generate(&mut rng, &desc);
+    let key_pair2 = elgamal::generate(&mut rng, &desc);
+    let key_pair3 = elgamal::generate(&mut rng, &desc);
+    let key_pair4 = elgamal::generate(&mut rng, &desc);
 
     Test {
         data: vec![

@@ -1,92 +1,110 @@
 use num::{Integer, Zero, One, Num};
 use rand::Rng;
 use modal::ModExp;
+use std::borrow::Borrow;
 
 
-pub trait Field<F>: Num + Integer + Zero + One + Clone + ModExp<F, Output=F> {}
-
-pub trait GroupDescription<F> where F: Field<F> {
-    fn generator(&self) -> F;
-    fn modulus(&self) -> F;
-    fn bit_size(&self) -> usize;
-}
+pub trait GroupElem: Num + Integer + Zero + One + Clone {}
 
 #[derive(Clone)]
-pub struct PublicKey<F, G> {
-    group_desc: G,
-    key: F,
+pub struct GroupSpec<Elem> {
+    gen: Elem,
+    modulus: Elem,
 }
 
-impl<F, G> PublicKey<F, G> where F: Field<F>, G: Clone + GroupDescription<F> {
-    pub fn new(group_desc: &G, key: &F) -> PublicKey<F, G> {
+impl<Elem> GroupSpec<Elem> where Elem: GroupElem {
+    pub fn new(gen: &Elem, modulus: &Elem) -> GroupSpec<Elem> {
+        GroupSpec {
+            gen: gen.clone(),
+            modulus: modulus.clone(),
+        }
+    }
+}
+
+pub trait CyclicGroup {
+    type Elem: GroupElem + ModExp;
+
+    fn group_spec(&self) -> GroupSpec<Self::Elem>;
+}
+
+
+#[derive(Clone)]
+pub struct PublicKey<G> where G: Clone + CyclicGroup {
+    group_spec: GroupSpec<G::Elem>,
+    key: G::Elem,
+}
+
+impl<G> PublicKey<G> where G: Clone + CyclicGroup {
+    pub fn new(group_spec: &GroupSpec<G::Elem>, key: &G::Elem) -> PublicKey<G> {
         PublicKey {
-            group_desc: group_desc.clone(),
+            group_spec: group_spec.clone(),
             key: key.clone(),
         }
     }
 }
 
 #[derive(Clone)]
-pub struct PrivateKey<F, G> {
-    group_desc: G,
-    key: F,
+pub struct PrivateKey<G> where G: Clone + CyclicGroup {
+    group_spec: GroupSpec<G::Elem>,
+    key: G::Elem,
 }
 
-impl<F, G> PrivateKey<F, G> where F: Field<F>, G: Clone + GroupDescription<F> {
-    pub fn new(group_desc: &G, key: &F) -> PrivateKey<F, G> {
+impl<G> PrivateKey<G> where G: Clone + CyclicGroup {
+    pub fn new(group_spec: &GroupSpec<G::Elem>, key: &G::Elem) -> PrivateKey<G> {
         PrivateKey {
-            group_desc: group_desc.clone(),
+            group_spec: group_spec.clone(),
             key: key.clone(),
         }
     }
 }
 
+
 #[derive(Clone)]
-pub struct KeyPair<F, G> {
-    private_key: PrivateKey<F, G>,
-    public_key: PublicKey<F, G>,
+pub struct KeyPair<G> where G: Clone + CyclicGroup {
+    private_key: PrivateKey<G>,
+    public_key: PublicKey<G>,
 }
 
-impl<F, G> KeyPair<F, G> where F: Field<F>, G: Clone + GroupDescription<F> {
-    pub fn new(private_key: PrivateKey<F, G>, public_key: PublicKey<F, G>) -> KeyPair<F, G> {
+impl<G> KeyPair<G> where G: Clone + CyclicGroup {
+    pub fn new(private_key: PrivateKey<G>, public_key: PublicKey<G>) -> KeyPair<G> {
         KeyPair {
             private_key: private_key,
             public_key: public_key,
         }
     }
 
-    pub fn private_key(&self) -> PrivateKey<F, G> {
+    pub fn private_key(&self) -> PrivateKey<G> {
         self.private_key.clone()
     }
 
-    pub fn public_key(&self) -> PublicKey<F, G> {
+    pub fn public_key(&self) -> PublicKey<G> {
         self.public_key.clone()
     }
 }
 
-
-pub trait RandomGroupElement<F, G> where F: Field<F>, G: GroupDescription<F> {
-    fn gen_group_element(&mut self, bit_size: usize) -> F;
-    fn gen_group_element_range(&mut self, lbound: &F, ubound: &F) -> F;
-}
-
-/*
-impl<R, F, G> RandGroupElement<F, G> for R 
-    where R: Rng,
-          F: Field<F>,
-          G: GroupDescription<F> 
+pub trait RandGroupElem<R, G> 
+    where R: Rng, 
+          G: Clone + CyclicGroup
 {
-    fn gen_group_element(&mut self, bit_size: usize) -> F {
-
-    }
-
-    fn gen_group_element_range(&mut self, lbound: &F, ubound: &F) -> F {
-
-    }
+    fn gen_group_elem(rng: &mut R, bit_size: usize) -> G::Elem;
+    fn gen_group_elem_range(rng: &mut R, lbound: &G::Elem, ubound: &G::Elem) -> G::Elem;
 }
-*/
 
-pub trait EncodeDecode<F> {
-    fn encode(&[u8]) -> F;
-    fn decode(digit: &F) -> Vec<u8>;
+pub trait EncodeDecode<G> {
+    fn encode(&[u8]) -> G;
+    fn decode(digits: &G) -> Vec<u8>;
+}
+
+pub fn generate<R, G>(rng: &mut R, spec: &GroupSpec<G::Elem>) -> ()// KeyPair<F, G> 
+    where R: Rng,
+          G: Clone + CyclicGroup + RandGroupElem<R, G>,
+{
+    let lbound: G::Elem = <G::Elem as One>::one();
+    let x: G::Elem = <G as RandGroupElem<_,_>>::gen_group_elem_range(rng, &lbound, &spec.modulus);
+    let h: G::Elem = <G::Elem as ModExp>::mod_exp(&spec.gen, &x, &spec.modulus);
+
+    let private_key = PrivateKey::new(spec, &x);
+    let public_key  = PublicKey::new(spec, &h);
+
+    KeyPair::new(private_key, public_key)
 }

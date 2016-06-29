@@ -96,10 +96,10 @@ fn encode(bytes: &[u8]) -> BigInt {
 
 #[inline]
 fn __encrypt(digit: &BigInt, nonce: &BigInt, key: &PublicKey) -> (BigInt, BigInt) {      
-    let gamma = <BigInt as ModExp<&_>>::mod_exp(&key.g, &nonce, &key.group.p);
+    let gamma = <BigInt as ModExp>::mod_exp(&key.g, &nonce, &key.group.p);
         
     let mmp = digit.mod_floor(&key.group.p);
-    let ak  = <BigInt as ModExp<&_>>::mod_exp(&key.key, &nonce, &key.group.p);
+    let ak  = <BigInt as ModExp>::mod_exp(&key.key, &nonce, &key.group.p);
     let delta = Integer::mod_floor(&(mmp*ak), &key.group.p);
 
     (gamma, delta)
@@ -107,7 +107,7 @@ fn __encrypt(digit: &BigInt, nonce: &BigInt, key: &PublicKey) -> (BigInt, BigInt
 
 #[inline]
 fn __decrypt(gamma: &BigInt, delta: &BigInt, key: &PrivateKey) -> BigInt {
-    let c = <BigInt as ModExp<&_>>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
+    let c = <BigInt as ModExp>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
         
     Integer::mod_floor(&(c * delta), &key.group.p)
 }
@@ -115,7 +115,7 @@ fn __decrypt(gamma: &BigInt, delta: &BigInt, key: &PrivateKey) -> BigInt {
 pub fn generate<R: Rng>(rng: &mut R, desc: &GroupDescription) -> KeyPair {
     let lbound: BigInt = BigInt::from(1);
     let x: BigInt = RandBigInt::gen_bigint_range(rng, &lbound, &desc.p);
-    let h: BigInt = <BigInt as ModExp<&_>>::mod_exp(&desc.g, &x, &desc.p);
+    let h: BigInt = <BigInt as ModExp>::mod_exp(&desc.g, &x, &desc.p);
 
     let private_key = PrivateKey::new(&desc, &desc.g, &x);
     let public_key  = PublicKey::new(&desc, &desc.g, &h);
