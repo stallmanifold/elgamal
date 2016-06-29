@@ -26,7 +26,6 @@ pub trait CyclicGroup {
     fn group_spec(&self) -> GroupSpec<Self::Elem>;
 }
 
-
 #[derive(Clone)]
 pub struct PublicKey<G> where G: Clone + CyclicGroup {
     group_spec: GroupSpec<G::Elem>,
@@ -56,7 +55,6 @@ impl<G> PrivateKey<G> where G: Clone + CyclicGroup {
         }
     }
 }
-
 
 #[derive(Clone)]
 pub struct KeyPair<G> where G: Clone + CyclicGroup {
@@ -92,6 +90,10 @@ pub trait RandGroupElem<R, G>
 pub trait EncodeDecode<G> {
     fn encode(&[u8]) -> G;
     fn decode(digits: &G) -> Vec<u8>;
+}
+
+pub trait GenerateKeyPair<G> where G: Clone + CyclicGroup {
+    fn generate_key_pair<R: Rng>(rng: &mut R, spec: &GroupSpec<G::Elem>) -> KeyPair<G>;
 }
 
 pub fn generate<R, G>(rng: &mut R, spec: &GroupSpec<G::Elem>) -> KeyPair<G> 

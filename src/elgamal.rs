@@ -95,7 +95,7 @@ fn encode(bytes: &[u8]) -> BigInt {
 }
 
 #[inline]
-fn __encrypt(digit: &BigInt, nonce: &BigInt, key: &PublicKey) -> (BigInt, BigInt) {      
+fn encrypt_digit(digit: &BigInt, nonce: &BigInt, key: &PublicKey) -> (BigInt, BigInt) {      
     let gamma = <BigInt as ModExp>::mod_exp(&key.g, &nonce, &key.group.p);
         
     let mmp = digit.mod_floor(&key.group.p);
@@ -106,7 +106,7 @@ fn __encrypt(digit: &BigInt, nonce: &BigInt, key: &PublicKey) -> (BigInt, BigInt
 }
 
 #[inline]
-fn __decrypt(gamma: &BigInt, delta: &BigInt, key: &PrivateKey) -> BigInt {
+fn decrypt_digit(gamma: &BigInt, delta: &BigInt, key: &PrivateKey) -> BigInt {
     let c = <BigInt as ModExp>::mod_exp(&gamma, &(&key.group.p - BigInt::from(1) - &key.key), &key.group.p);
         
     Integer::mod_floor(&(c * delta), &key.group.p)
@@ -135,7 +135,7 @@ pub fn encrypt<R: Rng>(rng: &mut R, plain_text: &[u8], key: &PublicKey) -> Ciphe
 
     for chunk in plain_text.chunks(bytes_per_digit) {
         let digit = encode(chunk);
-        let (gamma, delta) = __encrypt(&digit, &nonce, key);
+        let (gamma, delta) = encrypt_digit(&digit, &nonce, key);
         digits.push((gamma, delta));
     }
 
@@ -146,7 +146,7 @@ pub fn decrypt(cipher_text: &CipherText, key: &PrivateKey) -> PlainText {
     let mut plain_text = Vec::new();
 
     for &(ref gamma, ref delta) in cipher_text {
-        let digit     = __decrypt(&gamma, &delta, key);
+        let digit     = decrypt_digit(&gamma, &delta, key);
         let mut chunk = decode(&digit);
         plain_text.append(&mut chunk);
     }
