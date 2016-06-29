@@ -1,7 +1,6 @@
 use num::{Integer, Zero, One, Num};
 use rand::Rng;
 use modal::ModExp;
-use std::borrow::Borrow;
 
 
 pub trait GroupElem: Num + Integer + Zero + One + Clone {}
@@ -95,7 +94,7 @@ pub trait EncodeDecode<G> {
     fn decode(digits: &G) -> Vec<u8>;
 }
 
-pub fn generate<R, G>(rng: &mut R, spec: &GroupSpec<G::Elem>) -> ()// KeyPair<F, G> 
+pub fn generate<R, G>(rng: &mut R, spec: &GroupSpec<G::Elem>) -> KeyPair<G> 
     where R: Rng,
           G: Clone + CyclicGroup + RandGroupElem<R, G>,
 {
